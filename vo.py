@@ -23,7 +23,8 @@ def main():
     if len(sys.argv) == 2:
         cap = cv2.VideoCapture(sys.argv[1])
     else:
-        cap = cv2.VideoCapture("drone.mp4")
+        print("Not enough arguments")
+        exit(1)
 
     # track recent data
     frameDeque = deque(maxlen=2)
