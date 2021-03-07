@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 from collections import deque
 import cv2
 from matplotlib import pyplot as plt
@@ -16,8 +17,13 @@ def preproc(frame, scale_percent=50):
 
     return cv2.resize(img, dsize)
 
+
 def main():
-    cap = cv2.VideoCapture("drone.mp4")
+    
+    if len(sys.argv) == 2:
+        cap = cv2.VideoCapture(sys.argv[1])
+    else:
+        cap = cv2.VideoCapture("drone.mp4")
 
     # track recent data
     frameDeque = deque(maxlen=2)
