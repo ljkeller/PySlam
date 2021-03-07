@@ -17,7 +17,7 @@ pip install -r requirements.txt
 
 ## Built With
 
-* [Opencv](https://opencv-python-tutroals.readthedocs.io/en/latest/) - The web framework used
+* [Opencv](https://opencv-python-tutroals.readthedocs.io/en/latest/)
 
 ## Authors
 
