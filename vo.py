@@ -38,7 +38,7 @@ def main():
 
         ret, frame = cap.read()
         if not ret:
-            continue
+            exit()
     
         img = preproc(frame)
         features = fe.extract(img)
@@ -61,7 +61,7 @@ def main():
             #matches = sorted(matches, key = lambda x:x.queryIdx)
 
             # Draw first 10 matches
-            matchImage = cv2.drawMatches(frameDeque[0], kpDeque[0], frameDeque[1], kpDeque[1], matches[:10], None, flags=2)
+            matchImage = cv2.drawMatches(frameDeque[0], kpDeque[0], frameDeque[1], kpDeque[1], matches, None, flags=2)
             cv2.imshow("Matches", matchImage)
 
         if cv2.waitKey(30) & 0xFF == ord('q'):
