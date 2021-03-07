@@ -7,6 +7,11 @@ PySlam is a python SLAM implementation with design decisions driven from ORB SLA
 ### Prerequisites
 
 Tested on Ubuntu 20.04
+
+Test on Big Sur 11.2.1
+
+Python 3.7.0/3.8.5
+
 Python 3.x
 
 Requirements can be found in requirements.txt
