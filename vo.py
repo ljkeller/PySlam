@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 
 from Extractor import *
 
-def preproc(frame, scale_percent=50):
+def preproc(frame, scale_percent):
     # grayscale
     img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -19,11 +19,15 @@ def preproc(frame, scale_percent=50):
 
 
 def main():
-    
-    if len(sys.argv) == 2:
+
+    scale = None
+    if len(sys.argv) == 2 or len(sys.argv) == 3:
+        # Get video source and scale of video
         cap = cv2.VideoCapture(sys.argv[1])
+        if len(sys.argv) == 3:
+            scale = int(sys.argv[2])
     else:
-        print("Not enough arguments")
+        print("Invalid argument amount")
         exit(1)
 
     # track recent data
@@ -40,7 +44,7 @@ def main():
         if not ret:
             exit()
     
-        img = preproc(frame)
+        img = preproc(frame, scale if scale is not None else 50)
         features = fe.extract(img)
         if features['kps'] is None or features['des'] is None:
             continue
