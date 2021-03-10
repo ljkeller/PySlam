@@ -2,10 +2,14 @@ import numpy as np
 import cv2
 
 class Extractor:
-    def __init__(self):
+    # scoreType 
+    #           0 : Harris 1 
+    #           1 : FAST 
+
+    def __init__(self, numFeatures=500, scoreType=0):
 
         # create orb object with default params
-        self.orb = cv2.ORB_create()
+        self.orb = cv2.ORB_create(nfeatures=numFeatures, scoreType=scoreType)
 
         # create BFMatcher object used to brute-force match ORB descriptors
         # uses norm_hamming for ORB specifically

@@ -12,14 +12,28 @@ from Preprocessor import *
 def print_statistics():
     pass
 
+def createArgumentParser():
+    # Make argument parser for PySlam
+    parser = argparse.ArgumentParser(description='Python SLAM implementation.')
+
+    # required arguments
+    parser.add_argument('image_path', type=str, help='Absolute or relative path of the video file')
+
+    # optional arguments
+    parser.add_argument('-s', '--scale_percent', nargs='?', default=50, type=int, help='An integer percentage of preprocessor image scaling (default=50)')
+    parser.add_argument('-m', '--feature_matches', nargs='?', default=10, type=int, help='An integer representing how many feature matches to visualiz (default 10)')
+    parser.add_argument('-f', '--num_features', nargs='?', default=500, type=int, help='An integer representing the maximum number of features to retain (default 500)')
+    parser.add_argument('-t', '--score_type', nargs='?', default=0, type=int, help='An integer representing the feature detection type of 0:Harris, or 1:Fast (default:0)')
+
+    return parser
+
+def getProgramArguments():
+    return createArgumentParser().parse_args()
+
 def main():
 
     # Take command line arguments for various params
-    parser = argparse.ArgumentParser(description='Python SLAM implementation.')
-    parser.add_argument('image_path', type=str, help='Absolute or relative path of the video file')
-    parser.add_argument('-s', '--scale_percent', nargs='?', default=50, type=int, help='An integer percentage of preprocessor image scaling (default=50)')
-    parser.add_argument('-m', '--feature_matches', nargs='?', default=10, type=int, help='An integer representing how many feature matches to visualiz (default 10)')
-    args = parser.parse_args()
+    args = getProgramArguments()
 
     # track recent data
     frameDeque = deque(maxlen=2)
@@ -27,7 +41,7 @@ def main():
     desDeque = deque(maxlen=2)
     
     # Create feature extractor, capture stream, and preprocessor
-    fe = Extractor()
+    fe = Extractor(args.num_features)
     cap = cv2.VideoCapture(args.image_path)
     pp = Preprocessor(scalePercent=args.scale_percent)
 
