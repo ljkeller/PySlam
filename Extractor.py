@@ -13,6 +13,7 @@ class Extractor:
 
         # create BFMatcher object used to brute-force match ORB descriptors
         # uses norm_hamming for ORB specifically
+        # crossCheck=True filters outlier matches very well in highly-featured environments. Effectively k=1 in knnMatch
         self.bfm = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 
     def extract(self, frame):
