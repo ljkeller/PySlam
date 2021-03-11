@@ -7,14 +7,16 @@ from matplotlib import pyplot as plt
 # Our classes
 from Extractor import *
 from Preprocessor import *
+from Keyframe import *
 
 MIN_MATCH_COUNT = 30
 
 # Useful statistics for post-video analysis
-def printStatistics(*, totalFrames, lowFeatureFrames):
+def printStatistics(*, totalFrames, lowFeatureFrames, totalKeyframes):
     print(f'Total frames: {totalFrames}.')
     print(f'Low feature Frames: {lowFeatureFrames}.')
-    print(f'Total % of low-feature frames: %{lowFeatureFrames/totalFrames*100:.2f}.')
+    print(f'Total % of low-feature frames: {lowFeatureFrames/totalFrames*100:.2f}%.')
+    print(f'Total keyframes: {totalKeyframes}.')
 
 def createArgumentParser():
     # Make argument parser for PySlam
@@ -40,9 +42,11 @@ def main():
     args = getProgramArguments()
 
     # track recent data
+    # TODO: change feature to namedtuple('Feature', ['keypoint', 'descriptor'] & update code
     frameDeque = deque(maxlen=2)
     kpDeque = deque(maxlen=2)
     desDeque = deque(maxlen=2)
+    keyframes = []
     
     # Create feature extractor, capture stream, and preprocessor
     fe = Extractor(args.num_features)
@@ -51,14 +55,18 @@ def main():
 
     # For post-video statistics
     totalFrames = lowFeatureFrames = 0
+    framesSinceKeyframeInsert = 0
 
     while(cap.isOpened()):
 
         ret, frame = cap.read()
         if not ret:
-            printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames)
+            printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames, totalKeyframes=len(keyframes))
             exit()
+
+        # Iterate statistics variables
         totalFrames += 1
+        framesSinceKeyframeInsert += 1
     
         img = pp.preprocess(frame)
         features = fe.extract(img)
@@ -79,17 +87,34 @@ def main():
 
             # Get perspective transform
             if len(matches)>MIN_MATCH_COUNT:
+                # Identifies matches between keypoints deques and puts them into their respective lists
+                # TODO: Change old frame to src and newframe to dst
                 src_pts = np.float32([ kpDeque[0][m.queryIdx].pt for m in matches ]).reshape(-1,1,2)
                 dst_pts = np.float32([ kpDeque[1][m.trainIdx].pt for m in matches ]).reshape(-1,1,2)
                 
-                M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
+                # Homography model is good estimator for planar scenes
+                pose, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
+
+                # Make array in which x_i == 1 -> x_i feature is a match between src & dst points
                 matchesMask = mask.ravel().tolist()
 
                 h,w,d = frameDeque[0].shape
+
+                # Maps ROI to corners of image before performing perspective transform. New pose
+                # of ROI is representative of transformations being performed on camera between frames
                 pts = np.float32([ [0,0],[0,h-1],[w-1,h-1],[w-1,0] ]).reshape(-1,1,2)
-                dst = cv2.perspectiveTransform(pts,M)
+                dst = cv2.perspectiveTransform(pts,pose)
+
                 # Overlay perspective transform so its visible how camera is moving through environment
-                frameDeque[1] = cv2.polylines(frameDeque[1],[np.int32(dst)],True,255,3, cv2.LINE_AA)
+                poseDeltaImage = cv2.polylines(frameDeque[0].copy(),[np.int32(dst)],True,255,3, cv2.LINE_AA)
+
+
+                # TODO: update keyframe insertion criteria to be more reflective of ORB
+                if framesSinceKeyframeInsert >= 20:
+                    # TODO: Add intrinsics
+                    keyframes.append(Keyframe(pose=pose, features=features, intrinsics=None))
+                    framesSinceKeyframeInsert = 0
+
             else:
                 lowFeatureFrames += 1
                 matchesMask = None
@@ -99,6 +124,7 @@ def main():
                                matchesMask = matchesMask, # draw only inliers
                                flags = 2)
 
+            # Inlier matches are those decided acceptable by RANSAC
             inlierMatches = cv2.drawMatches(frameDeque[0],kpDeque[0],frameDeque[1],kpDeque[1],matches,None,**draw_params)
             cv2.imshow("Inlier Matches", inlierMatches)
 
@@ -107,10 +133,10 @@ def main():
             # Draw first 10 matches
             matchImage = cv2.drawMatches(frameDeque[0], kpDeque[0], frameDeque[1], kpDeque[1], matches[:args.feature_matches], None, flags=2)
             cv2.imshow("Matches", matchImage)
-            cv2.imshow("Last Frame", frameDeque[1])
+            cv2.imshow("Current frame with delta pose", poseDeltaImage)
 
         if cv2.waitKey(30) & 0xFF == ord('q'):
-            printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames)
+            printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames, totalKeyframes=len(keyframes))
             break
 
     cap.release()
