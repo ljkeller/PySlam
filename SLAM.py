@@ -95,6 +95,9 @@ def main():
                 # Homography model is good estimator for planar scenes
                 pose, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
 
+                # TODO: Get essential matrix here, then recover pose
+                #reval, mask = cv2.findFundamentalMat(src_pts, dst_pts, cv2.FM_RANSAC)
+
                 # Make array in which x_i == 1 -> x_i feature is a match between src & dst points
                 matchesMask = mask.ravel().tolist()
 
@@ -104,6 +107,7 @@ def main():
                 # of ROI is representative of transformations being performed on camera between frames
                 pts = np.float32([ [0,0],[0,h-1],[w-1,h-1],[w-1,0] ]).reshape(-1,1,2)
                 dst = cv2.perspectiveTransform(pts,pose)
+
 
                 # Overlay perspective transform so its visible how camera is moving through environment
                 poseDeltaImage = cv2.polylines(frameDeque[0].copy(),[np.int32(dst)],True,255,3, cv2.LINE_AA)
