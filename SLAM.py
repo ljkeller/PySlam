@@ -30,6 +30,7 @@ def createArgumentParser():
     parser.add_argument('-m', '--feature_matches', nargs='?', default=10, type=int, help='An integer representing how many feature matches to visualiz (default 10)')
     parser.add_argument('-f', '--num_features', nargs='?', default=500, type=int, help='An integer representing the maximum number of features to retain (default 500)')
     parser.add_argument('-t', '--score_type', nargs='?', default=0, type=int, help='An integer representing the feature detection type of 0:Harris, or 1:Fast (default:0)')
+    parser.add_argument('-d', '--debug', action='store_true', help='An argument that enables debug mode, which prints information & displays several screens')
 
     return parser
 
@@ -112,6 +113,7 @@ def main():
                 # Overlay perspective transform so its visible how camera is moving through environment
                 poseDeltaImage = cv2.polylines(frameDeque[0].copy(),[np.int32(dst)],True,255,3, cv2.LINE_AA)
 
+                # TODO: Develop 2 models, one for planar and one for non planar scene. Calculate idea model for given situation & use it
 
                 # TODO: update keyframe insertion criteria to be more reflective of ORB
                 if framesSinceKeyframeInsert >= 20:
@@ -130,13 +132,14 @@ def main():
 
             # Inlier matches are those decided acceptable by RANSAC
             inlierMatches = cv2.drawMatches(frameDeque[0],kpDeque[0],frameDeque[1],kpDeque[1],matches,None,**draw_params)
-            cv2.imshow("Inlier Matches", inlierMatches)
 
-            # TODO: Develop 2 models, one for planar and one for non planar scene. Calculate idea model for given situation & use it
-
-            # Draw first 10 matches
+            # Draw first args.feature_matches amount of matches
             matchImage = cv2.drawMatches(frameDeque[0], kpDeque[0], frameDeque[1], kpDeque[1], matches[:args.feature_matches], None, flags=2)
-            cv2.imshow("Matches", matchImage)
+            
+            if args.debug:
+                cv2.imshow("Inlier Matches", inlierMatches)
+                cv2.imshow("Matches", matchImage)
+
             cv2.imshow("Current frame with delta pose", poseDeltaImage)
 
         if cv2.waitKey(30) & 0xFF == ord('q'):
