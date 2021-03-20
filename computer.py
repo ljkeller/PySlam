@@ -17,8 +17,8 @@ def pillowToNPArray(pillowImage):
 
 def stream():
 	# Adapted from https://jmlb.github.io/robotics/2017/11/22/picamera_streaming_video/
-	server_socket = socket.socket()
-	server_socket.bind(('0.0.0.0', 8000))
+	server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	server_socket.bind(('', 8000))
 	server_socket.listen(0)
 	# Accept a single connection and make a file-like object out of it
 	connection = server_socket.accept()[0].makefile('rb')

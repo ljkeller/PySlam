@@ -23,8 +23,8 @@ def gen_seq():
         write_img_to_stream(stream)
 
 # Connect a client socket to server_ip:8000
-client_socket = socket.socket()
-ip_address = "192.168.1.20"
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+ip_address = "127.0.0.1"
 client_socket.connect( ( ip_address, 8000 ) )
 # Make a file-like object out of the connection
 connection = client_socket.makefile('wb')
