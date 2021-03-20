@@ -24,6 +24,7 @@ def gen_seq():
 
 # Connect a client socket to server_ip:8000
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# Ip address for server, current set as self
 ip_address = "127.0.0.1"
 client_socket.connect( ( ip_address, 8000 ) )
 # Make a file-like object out of the connection
@@ -32,13 +33,11 @@ connection = client_socket.makefile('wb')
 if __name__ == '__main__':
     try:
         with picamera.PiCamera() as camera:
+            # Set resolution of PI camera
             camera.resolution = (640,480)
-            #Adjust framerate to send higher number of pixels 
+            # Adjust framerate to correspond with camera resolution
             camera.framerate = 20
-            # Start a preview and let the camera warm up for 2 seconds
-            camera.start_preview()
-            time.sleep(2)
-            camera.stop_preview()
+            # Create sequence of image from camera
             camera.capture_sequence(gen_seq(), "jpeg", use_video_port=True)
         connection.write(struct.pack('<L', 0))
     finally:

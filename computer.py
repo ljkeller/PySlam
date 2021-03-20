@@ -17,12 +17,16 @@ def pillowToNPArray(pillowImage):
 
 def stream():
 	# Adapted from https://jmlb.github.io/robotics/2017/11/22/picamera_streaming_video/
+        # Create server socket
 	server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Listen on all available IP addresses
 	server_socket.bind(('', 8000))
-	server_socket.listen(0)
+        # Queue at most 1 connection
+	server_socket.listen(1)
 	# Accept a single connection and make a file-like object out of it
 	connection = server_socket.accept()[0].makefile('rb')
-	W, H = 28, 28
+        # Width and height of the video stream from the PI
+	W, H = 640, 480
 
 	try:
 		while True:
@@ -48,6 +52,7 @@ def stream():
 			#Convert to cv2 usable image
 			newIm = pillowToNPArray(image)
 
+                        # Draw the current image to the stream
 			drawMethod(newIm)	
 			
 	finally:
