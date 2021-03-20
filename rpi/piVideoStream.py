@@ -1,3 +1,7 @@
+# This file is to be ran on a raspberry pi with the official pi camera.
+# This file works in conjunction with server.py.
+# The ip address and connection port should be modified to your use.
+
 # client.py
 import io
 import socket

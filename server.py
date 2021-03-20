@@ -1,3 +1,8 @@
+# This file is meant to read in and display a video stream from a raspberry pi.
+# This file works in conjunction with piVideoStream.py.
+# The ip address and connection port should be changed as per your use.
+# This file only displays the images but can be adapted to process the image as well. 
+
 # server.py
 import io
 import socket
