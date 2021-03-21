@@ -23,7 +23,7 @@ class Endpoint():
         self.server_socket.listen(1)
 
         # Accept a single connection and make a file-like object out of it
-        self.connection = server_socket.accept()[0].makefile('rb')
+        self.connection = self.server_socket.accept()[0].makefile('rb')
 
         # Width and height of the video stream from the PI
         self.imW, self.imH = 640, 480
@@ -38,20 +38,21 @@ class Endpoint():
     #         (false, None) on failure
     def read(self):
         # Read the length of the image as a 32-bit unsigned int.
-        if image_len := struct.unpack('<L', self.connection.read(struct.calcsize('<L')))[0] is not None:
-            return (-1, None)
+        image_len = struct.unpack('<L', self.connection.read(struct.calcsize('<L')))[0]
+        if image_len == False:
+            return (False, None)
 
         # TODO: make thread-safe queue later
+        self.image_stream = io.BytesIO()
         image = None
-
         try:
             # reading jpeg image from binary stream
             self.image_stream.write(self.connection.read(image_len))
             # reconstruct image with pillow
-            image = Image.open(image_stream)
+            image = Image.open(self.image_stream)
         except:
             # if reading raw images: yuv or rgb
-            image = Image.frombytes('L', (W, H), self.image_stream.read())
+            image = Image.frombytes('L', (self.imW, self.imH), self.image_stream.read())
 
         # Rewind the stream
         self.image_stream.seek(0)
@@ -62,9 +63,10 @@ class Endpoint():
 
     # Detects if socket stream still open by peeking and catching common
     def isOpened(self):
+        """
         try:
             # this will try to read bytes without blocking and also without removing them from buffer (peek only)
-            data = sock.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
+            data = self.connection.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
             if len(data) == 0:
                 return True
         except BlockingIOError:
@@ -74,9 +76,12 @@ class Endpoint():
         except Exception as e:
             logger.exception("unexpected exception when checking if a socket is closed")
             return False
+"""
+        return True
 
     # Wraps up sockets, call this before closing program.
     # Would put in constructor, but have to replicate cv2 behaviour
     def release(self):
+        print("release\n")
         self.connection.close()
         self.server_socket.close()
