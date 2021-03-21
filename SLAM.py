@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from Extractor import *
 from Preprocessor import *
 from Keyframe import *
+from Endpoint import Endpoint
 
 MIN_MATCH_COUNT = 30
 
@@ -23,9 +24,11 @@ def createArgumentParser():
     parser = argparse.ArgumentParser(description='Python SLAM implementation.')
 
     # required arguments
-    parser.add_argument('image_path', type=str, help='Absolute or relative path of the video file')
+    #parser.add_argument('image_path', type=str, help='Absolute or relative path of the video file')
 
     # optional arguments, require additional args
+    parser.add_argument('-i', '--image_path', nargs='?', default = "", \
+            type=str, help='Absolute or relative path of the video file')
     parser.add_argument('-s', '--scale_percent', nargs='?', default=50, \
             type=int, help='An integer percentage of preprocessor image scaling (default=50)')
     parser.add_argument('-m', '--feature_matches', nargs='?', default=10, \
@@ -38,6 +41,8 @@ def createArgumentParser():
     # optional boolean action arguments, dont require additional args
     parser.add_argument('-d', '--debug', action='store_true', \
             help='An argument that enables debug mode, which prints information & displays several screens')
+    parser.add_argument('-r', '--rpi_stream', action='store_true', \
+            help='An argument specifying to run PiSlam in client/server configuration (default port:30000)')
 
     return parser
 
@@ -59,6 +64,9 @@ def main():
     
     # Create feature extractor, capture stream, and preprocessor
     fe = Extractor(args.num_features)
+
+    cap = Endpoint() if args.rpi_stream else cv2.VideoCapture(args.image_path)
+    
     cap = cv2.VideoCapture(args.image_path)
     pp = Preprocessor(scalePercent=args.scale_percent)
 
