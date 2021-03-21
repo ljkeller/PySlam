@@ -67,7 +67,6 @@ def main():
 
     cap = Endpoint() if args.rpi_stream else cv2.VideoCapture(args.image_path)
     
-    #cap = cv2.VideoCapture(args.image_path)
     pp = Preprocessor(scalePercent=args.scale_percent)
 
     # For post-video statistics

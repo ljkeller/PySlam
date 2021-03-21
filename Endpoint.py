@@ -61,23 +61,12 @@ class Endpoint():
         npImage = np.array(image)
         return (True, npImage)
 
-    # Detects if socket stream still open by peeking and catching common
+    # Detects if socket stream still open by checking file status
     def isOpened(self):
-        """
         try:
-            # this will try to read bytes without blocking and also without removing them from buffer (peek only)
-            data = self.connection.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
-            if len(data) == 0:
-                return True
-        except BlockingIOError:
-            return True  # socket is open and reading from it would block
-        except ConnectionResetError:
-            return False  # socket was closed for some other reason
+            return self.connection.readable()
         except Exception as e:
-            logger.exception("unexpected exception when checking if a socket is closed")
             return False
-"""
-        return True
 
     # Wraps up sockets, call this before closing program.
     # Would put in constructor, but have to replicate cv2 behaviour
