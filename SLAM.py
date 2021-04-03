@@ -20,7 +20,38 @@ import pangolin
 class Mapper(Thread):
     def __init__(self):
         Thread.__init__(self)
+        self.poses = []
 
+    def draw_trajectory(self, trajectory):
+        # Draw lines
+        gl.glLineWidth(1)
+        gl.glColor3f(0.0, 0.0, 0.0)
+
+        pangolin.DrawLine(trajectory)   # consecutive
+
+        gl.glColor3f(0.0, 1.0, 0.0)
+        pangolin.DrawLines(
+            trajectory, 
+            trajectory + np.random.randn(len(trajectory), 3), 
+            point_size=5)   # separate
+
+    def draw_keyframe(self, pose, coord):
+        # Create base translation matrix
+        pose = np.identity(4)
+        print(pose[:3, 3])
+        
+        # Set dx, dy, dz to random values (coordinate changes)
+        pose[:3, 3] = np.random.randn(3)
+
+        self.poses.append(pose)
+
+        gl.glLineWidth(1)
+        gl.glColor3f(0.0, 0.0, 1.0)
+        pangolin.DrawCameras(self.poses, 0.5, 0.75, 0.8)
+
+
+    def test(self):
+        print(test)
     # Override run method, this will now run in parrallel upon thread.start()
     def run(self):
         pangolin.CreateWindowAndBind('Main', 640, 480)
@@ -40,7 +71,7 @@ class Mapper(Thread):
         dcam.SetHandler(handler)
 
         
-        trajectory = [[0, -6, 6]]
+        trajectory = [[20, -6, 6]]
         for i in range(300):
             trajectory.append(trajectory[-1] + np.random.random(3)-0.5)
         trajectory = np.array(trajectory)
@@ -51,15 +82,18 @@ class Mapper(Thread):
             dcam.Activate(scam)
             
             # Render OpenGL Cube
-            pangolin.glDrawColouredCube(0.1)
+            #pangolin.glDrawColouredCube(0.1)
 
             # Draw Point Cloud
+            """
             points = np.random.random((10000, 3)) * 3 - 4
             gl.glPointSize(1)
             gl.glColor3f(1.0, 0.0, 0.0)
             pangolin.DrawPoints(points)
+            """
 
             # Draw Point Cloud
+            """
             points = np.random.random((10000, 3))
             colors = np.zeros((len(points), 3))
             colors[:, 1] = 1 -points[:, 0]
@@ -68,7 +102,11 @@ class Mapper(Thread):
             points = points * 3 + 1
             gl.glPointSize(1)
             pangolin.DrawPoints(points, colors)
+            """
 
+            self.draw_trajectory(trajectory)
+            self.draw_keyframe(None, None)
+            """
             # Draw lines
             gl.glLineWidth(1)
             gl.glColor3f(0.0, 0.0, 0.0)
@@ -79,14 +117,19 @@ class Mapper(Thread):
                 trajectory + np.random.randn(len(trajectory), 3), 
                 point_size=5)   # separate
 
+            """
+
             # Draw camera
+            """
             pose = np.identity(4)
             pose[:3, 3] = np.random.randn(3)
             gl.glLineWidth(1)
             gl.glColor3f(0.0, 0.0, 1.0)
             pangolin.DrawCamera(pose, 0.5, 0.75, 0.8)
+            """
 
             # Draw boxes
+            """
             poses = [np.identity(4) for i in range(10)]
             for pose in poses:
                 pose[:3, 3] = np.random.randn(3) + np.array([5,-3,0])
@@ -94,7 +137,7 @@ class Mapper(Thread):
             gl.glLineWidth(1)
             gl.glColor3f(1.0, 0.0, 1.0)
             pangolin.DrawBoxes(poses, sizes)
-
+            """
 
             pangolin.FinishFrame()
 
@@ -167,7 +210,6 @@ def main():
     while(cap.isOpened()):
 
         ret, frame = cap.read()
-        print(ret)
         if not ret:
             printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames, totalKeyframes=len(keyframes))
             exit()
