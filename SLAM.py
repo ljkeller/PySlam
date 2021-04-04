@@ -11,114 +11,8 @@ from Preprocessor import *
 from Keyframe import *
 from Endpoint import Endpoint
 
-
 # Mapping
-import OpenGL.GL as gl
-import pangolin
-
-# Make mapping class that inherits from Thread
-class Mapper(Thread):
-    def __init__(self):
-        Thread.__init__(self)
-
-        self.poses = []
-        self.path = []
-
-        self.system_coord = self.generate_trajectory()
-
-    # Constant velocity model, will of course update this
-    def generate_trajectory(self):
-        # Starting at origin
-        coord = np.zeros(3)
-        print(coord)
-        print(type(coord))
-        while not pangolin.ShouldQuit():
-            yield coord
-            coord = coord + np.random.rand(1,3)[0] # Add some random amount to previous
-
-    def draw_trajectory(self):
-        if len(self.path) > 1:
-            # Draw lines
-            gl.glLineWidth(1)
-            gl.glColor3f(0.0, 0.0, 0.0)
-
-            #pangolin.DrawLine(self.path)   # consecutive
-            pangolin.DrawLine(np.array(self.path))
-
-            """
-            gl.glColor3f(0.0, 1.0, 0.0)
-            pangolin.DrawLines(
-                trajectory, 
-                trajectory + np.random.randn(len(trajectory), 3), 
-                point_size=5)   # separate
-            """
-
-    def draw_keyframe(self, pose, coord):
-        # Create base translation matrix
-        pose = np.identity(4)
-        
-        # Set dx, dy, dz to random values (coordinate changes)
-        if coord is None:
-            pose[:3, 3] = np.random.randn(3)
-        else:
-            pose[:3, 3] = coord
-
-        self.poses.append(pose)
-
-        gl.glLineWidth(1)
-        gl.glColor3f(0.0, 0.0, 1.0)
-        pangolin.DrawCameras(self.poses, 0.5, 0.75, 0.8)
-
-
-    # Override run method, this will now run in parrallel upon thread.start()
-    def run(self):
-        pangolin.CreateWindowAndBind('Main', 640, 480)
-        gl.glEnable(gl.GL_DEPTH_TEST)
-
-        # Define projection and initial ModelView matrix
-
-        # Define Projection and initial ModelView matrix
-        scam = pangolin.OpenGlRenderState(
-            pangolin.ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 200),
-            pangolin.ModelViewLookAt(-2, 2, -2, 0, 0, 0, pangolin.AxisDirection.AxisY))
-        handler = pangolin.Handler3D(scam)
-
-        # Create Interactive View in window
-        dcam = pangolin.CreateDisplay()
-        dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -640.0/480.0)
-        dcam.SetHandler(handler)
-
-        while not pangolin.ShouldQuit():
-            gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
-            gl.glClearColor(1.0, 1.0, 1.0, 1.0)
-            dcam.Activate(scam)
-            
-            # Draw Point Cloud
-            """
-            points = np.random.random((10000, 3)) * 3 - 4
-            gl.glPointSize(1)
-            gl.glColor3f(1.0, 0.0, 0.0)
-            pangolin.DrawPoints(points)
-            """
-
-            # Draw Point Cloud
-            """
-            points = np.random.random((10000, 3))
-            colors = np.zeros((len(points), 3))
-            colors[:, 1] = 1 -points[:, 0]
-            colors[:, 2] = 1 - points[:, 1]
-            colors[:, 0] = 1 - points[:, 2]
-            points = points * 3 + 1
-            gl.glPointSize(1)
-            pangolin.DrawPoints(points, colors)
-            """
-
-            self.path.append(next(self.system_coord))
-
-            self.draw_trajectory()
-            self.draw_keyframe(pose=None, coord=self.path[-1])
-
-            pangolin.FinishFrame()
+from Map import *
 
 MIN_MATCH_COUNT = 30
 
@@ -132,9 +26,6 @@ def printStatistics(*, totalFrames, lowFeatureFrames, totalKeyframes):
 def createArgumentParser():
     # Make argument parser for PySlam
     parser = argparse.ArgumentParser(description='Python SLAM implementation.')
-
-    # required arguments
-    #parser.add_argument('image_path', type=str, help='Absolute or relative path of the video file')
 
     # optional arguments, require additional args
     parser.add_argument('-i', '--image_path', nargs='?', default = "", \
@@ -175,10 +66,12 @@ def main():
     # Create feature extractor, capture stream, and preprocessor
     fe = Extractor(args.num_features)
 
+    # Link with RPI depending upon program arguments
     cap = Endpoint() if args.rpi_stream else cv2.VideoCapture(args.image_path)
     
     pp = Preprocessor(scalePercent=args.scale_percent)
     
+    # Instantiate MAP & start mapping thread
     map_system = Mapper()
     map_system.start()
 
@@ -189,8 +82,10 @@ def main():
     while(cap.isOpened()):
 
         ret, frame = cap.read()
+        # TODO: catch sigint
         if not ret:
-            printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames, totalKeyframes=len(keyframes))
+            printStatistics(totalFrames=totalFrames, \
+                    lowFeatureFrames=lowFeatureFrames, totalKeyframes=len(keyframes))
             exit()
 
         # Iterate statistics variables
@@ -241,7 +136,8 @@ def main():
                 # Overlay perspective transform so its visible how camera is moving through environment
                 poseDeltaImage = cv2.polylines(frameDeque[0].copy(),[np.int32(dst)],True,255,3, cv2.LINE_AA)
 
-                # TODO: Develop 2 models, one for planar and one for non planar scene. Calculate idea model for given situation & use it
+                # TODO: Develop 2 models, one for planar and one for non planar scene. 
+                # Calculate idea model for given situation & use it
 
                 # TODO: update keyframe insertion criteria to be more reflective of ORB
                 if framesSinceKeyframeInsert >= 20:
@@ -273,8 +169,11 @@ def main():
             cv2.imshow("Current frame with delta pose", poseDeltaImage)
 
 
-        if cv2.waitKey(30) & 0xFF == ord('q'):
-            printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames, totalKeyframes=len(keyframes))
+        # Escape on <esc>
+        if cv2.waitKey(30) == 27:
+            printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames, \
+                    totalKeyframes=len(keyframes))
+            map_system.stop()
             break
 
     map_system.join()
