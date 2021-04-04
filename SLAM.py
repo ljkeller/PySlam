@@ -20,28 +20,48 @@ import pangolin
 class Mapper(Thread):
     def __init__(self):
         Thread.__init__(self)
+
         self.poses = []
+        self.path = []
 
-    def draw_trajectory(self, trajectory):
-        # Draw lines
-        gl.glLineWidth(1)
-        gl.glColor3f(0.0, 0.0, 0.0)
+        self.system_coord = self.generate_trajectory()
 
-        pangolin.DrawLine(trajectory)   # consecutive
+    # Constant velocity model, will of course update this
+    def generate_trajectory(self):
+        # Starting at origin
+        coord = np.zeros(3)
+        print(coord)
+        print(type(coord))
+        while not pangolin.ShouldQuit():
+            yield coord
+            coord = coord + np.random.rand(1,3)[0] # Add some random amount to previous
 
-        gl.glColor3f(0.0, 1.0, 0.0)
-        pangolin.DrawLines(
-            trajectory, 
-            trajectory + np.random.randn(len(trajectory), 3), 
-            point_size=5)   # separate
+    def draw_trajectory(self):
+        if len(self.path) > 1:
+            # Draw lines
+            gl.glLineWidth(1)
+            gl.glColor3f(0.0, 0.0, 0.0)
+
+            #pangolin.DrawLine(self.path)   # consecutive
+            pangolin.DrawLine(np.array(self.path))
+
+            """
+            gl.glColor3f(0.0, 1.0, 0.0)
+            pangolin.DrawLines(
+                trajectory, 
+                trajectory + np.random.randn(len(trajectory), 3), 
+                point_size=5)   # separate
+            """
 
     def draw_keyframe(self, pose, coord):
         # Create base translation matrix
         pose = np.identity(4)
-        print(pose[:3, 3])
         
         # Set dx, dy, dz to random values (coordinate changes)
-        pose[:3, 3] = np.random.randn(3)
+        if coord is None:
+            pose[:3, 3] = np.random.randn(3)
+        else:
+            pose[:3, 3] = coord
 
         self.poses.append(pose)
 
@@ -50,8 +70,6 @@ class Mapper(Thread):
         pangolin.DrawCameras(self.poses, 0.5, 0.75, 0.8)
 
 
-    def test(self):
-        print(test)
     # Override run method, this will now run in parrallel upon thread.start()
     def run(self):
         pangolin.CreateWindowAndBind('Main', 640, 480)
@@ -70,20 +88,11 @@ class Mapper(Thread):
         dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -640.0/480.0)
         dcam.SetHandler(handler)
 
-        
-        trajectory = [[20, -6, 6]]
-        for i in range(300):
-            trajectory.append(trajectory[-1] + np.random.random(3)-0.5)
-        trajectory = np.array(trajectory)
-
         while not pangolin.ShouldQuit():
             gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
             gl.glClearColor(1.0, 1.0, 1.0, 1.0)
             dcam.Activate(scam)
             
-            # Render OpenGL Cube
-            #pangolin.glDrawColouredCube(0.1)
-
             # Draw Point Cloud
             """
             points = np.random.random((10000, 3)) * 3 - 4
@@ -104,40 +113,10 @@ class Mapper(Thread):
             pangolin.DrawPoints(points, colors)
             """
 
-            self.draw_trajectory(trajectory)
-            self.draw_keyframe(None, None)
-            """
-            # Draw lines
-            gl.glLineWidth(1)
-            gl.glColor3f(0.0, 0.0, 0.0)
-            pangolin.DrawLine(trajectory)   # consecutive
-            gl.glColor3f(0.0, 1.0, 0.0)
-            pangolin.DrawLines(
-                trajectory, 
-                trajectory + np.random.randn(len(trajectory), 3), 
-                point_size=5)   # separate
+            self.path.append(next(self.system_coord))
 
-            """
-
-            # Draw camera
-            """
-            pose = np.identity(4)
-            pose[:3, 3] = np.random.randn(3)
-            gl.glLineWidth(1)
-            gl.glColor3f(0.0, 0.0, 1.0)
-            pangolin.DrawCamera(pose, 0.5, 0.75, 0.8)
-            """
-
-            # Draw boxes
-            """
-            poses = [np.identity(4) for i in range(10)]
-            for pose in poses:
-                pose[:3, 3] = np.random.randn(3) + np.array([5,-3,0])
-            sizes = np.random.random((len(poses), 3))
-            gl.glLineWidth(1)
-            gl.glColor3f(1.0, 0.0, 1.0)
-            pangolin.DrawBoxes(poses, sizes)
-            """
+            self.draw_trajectory()
+            self.draw_keyframe(pose=None, coord=self.path[-1])
 
             pangolin.FinishFrame()
 
