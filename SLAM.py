@@ -1,5 +1,6 @@
 import numpy as np
 import argparse
+from threading import Thread
 from collections import deque
 import cv2
 from matplotlib import pyplot as plt
@@ -9,6 +10,9 @@ from Extractor import *
 from Preprocessor import *
 from Keyframe import *
 from Endpoint import Endpoint
+
+# Mapping
+from Map import *
 
 MIN_MATCH_COUNT = 30
 
@@ -22,9 +26,6 @@ def printStatistics(*, totalFrames, lowFeatureFrames, totalKeyframes):
 def createArgumentParser():
     # Make argument parser for PySlam
     parser = argparse.ArgumentParser(description='Python SLAM implementation.')
-
-    # required arguments
-    #parser.add_argument('image_path', type=str, help='Absolute or relative path of the video file')
 
     # optional arguments, require additional args
     parser.add_argument('-i', '--image_path', nargs='?', default = "", \
@@ -65,9 +66,14 @@ def main():
     # Create feature extractor, capture stream, and preprocessor
     fe = Extractor(args.num_features)
 
+    # Link with RPI depending upon program arguments
     cap = Endpoint() if args.rpi_stream else cv2.VideoCapture(args.image_path)
     
     pp = Preprocessor(scalePercent=args.scale_percent)
+    
+    # Instantiate MAP & start mapping thread
+    map_system = Mapper()
+    map_system.start()
 
     # For post-video statistics
     totalFrames = lowFeatureFrames = 0
@@ -76,9 +82,10 @@ def main():
     while(cap.isOpened()):
 
         ret, frame = cap.read()
-        print(ret)
+        # TODO: catch sigint
         if not ret:
-            printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames, totalKeyframes=len(keyframes))
+            printStatistics(totalFrames=totalFrames, \
+                    lowFeatureFrames=lowFeatureFrames, totalKeyframes=len(keyframes))
             exit()
 
         # Iterate statistics variables
@@ -129,7 +136,8 @@ def main():
                 # Overlay perspective transform so its visible how camera is moving through environment
                 poseDeltaImage = cv2.polylines(frameDeque[0].copy(),[np.int32(dst)],True,255,3, cv2.LINE_AA)
 
-                # TODO: Develop 2 models, one for planar and one for non planar scene. Calculate idea model for given situation & use it
+                # TODO: Develop 2 models, one for planar and one for non planar scene. 
+                # Calculate idea model for given situation & use it
 
                 # TODO: update keyframe insertion criteria to be more reflective of ORB
                 if framesSinceKeyframeInsert >= 20:
@@ -160,10 +168,15 @@ def main():
 
             cv2.imshow("Current frame with delta pose", poseDeltaImage)
 
-        if cv2.waitKey(30) & 0xFF == ord('q'):
-            printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames, totalKeyframes=len(keyframes))
+
+        # Escape on <esc>
+        if cv2.waitKey(30) == 27:
+            printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames, \
+                    totalKeyframes=len(keyframes))
+            map_system.stop()
             break
 
+    map_system.join()
     cap.release()
     cv2.destroyAllWindows()
 
