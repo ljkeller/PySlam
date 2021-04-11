@@ -144,8 +144,6 @@ def main():
 
                 correct_translation = t
 
-
-
                 # Two views - general moteion, general structure
                 # 1. Esimate essential/fundamental mat
                 # 2. Decompose the essential mat

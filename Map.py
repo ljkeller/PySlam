@@ -1,6 +1,7 @@
 #Standard libs
 import numpy as np
 from threading import Thread
+import math
 
 # Mapping
 import OpenGL.GL as gl
@@ -81,6 +82,11 @@ class Mapper(Thread):
         # Create base translation matrix
         if pose is None:
             pose = np.identity(4)
+
+        # Fix later, pi is not 1.8
+        angle_radian = 1.8
+        y = [[math.cos(angle_radian),0,math.sin(angle_radian)],[0,1,0],[-math.sin(angle_radian),0,math.cos(angle_radian)]]
+        pose[:3,:3] = np.matmul(y, pose[:3,:3])
         
         # Set dx, dy, dz to random values (coordinate changes)
         if coord is None:
