@@ -130,20 +130,21 @@ def main():
                 pose, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
 
                 ret1, rot, tran, _ = cv2.decomposeHomographyMat(pose, K[0:3, 0:3])
-                print(tran)
 
                 # TODO identify valid translation
-                correct_translation = tran[0]
 
                 # Recover global & local transformation data
                 F, maskf = cv2.findFundamentalMat(src_pts, dst_pts, cv2.FM_LMEDS)
 
                 E, maske = cv2.findEssentialMat(src_pts, dst_pts, K[0:3, 0:3], cv2.RANSAC, 0.9, 2)
                 r1, r2, t = cv2.decomposeEssentialMat(E)
-                print("TRANSLATION")
-                print(t)
-                print("-----")
-                #print(E)
+
+                if t[0] <0:
+                	t = -t
+
+                correct_translation = t
+
+
 
                 # Two views - general moteion, general structure
                 # 1. Esimate essential/fundamental mat

@@ -88,7 +88,6 @@ class Mapper(Thread):
         else:
             pose[:3, 3] = coord
 
-        print(pose)
         if self.cur_pose is not None:
             #pose[0:3, 0:3] = np.matmul(self.cur_pose, np.identity(3))
             pass
@@ -127,11 +126,9 @@ class Mapper(Thread):
             self.dcam.Activate(self.scam)
             
             translation = self.q.pop()
-            #print(translation)
-            self.system_coord = self.system_coord + translation
-            print(self.system_coord)
+            self.system_coord = self.system_coord + translation            
+            
             self.path.append(self.system_coord[0])
-            #print(self.system_coord)
 
             self.draw_trajectory()
             self.draw_keyframe(pose=None, coord=np.transpose(self.system_coord))
