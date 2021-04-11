@@ -128,7 +128,8 @@ class Mapper(Thread):
             translation = self.q.pop()
             self.system_coord = self.system_coord + translation            
             
-            self.path.append(self.system_coord[0])
+            print(np.transpose(self.system_coord)[0])
+            self.path.append(np.transpose(self.system_coord)[0])
 
             self.draw_trajectory()
             self.draw_keyframe(pose=None, coord=np.transpose(self.system_coord))
