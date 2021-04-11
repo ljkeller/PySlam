@@ -23,5 +23,6 @@ class Keyframe:
         self.kps = features['kps']
         self.descriptors = features['des']
         
-        # focal length & principle point
+        # Camera matrix 3x4 representation
+        # Contains focal point, etc
         self.intrinsics = intrinsics

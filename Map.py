@@ -17,8 +17,13 @@ class Mapper(Thread):
         self.points = []
         self.path = []
 
+        self.q = []
+
+        self.cur_pose = None
+
         # Generator for next position
-        self.system_coord = self.generate_trajectory()
+        #self.system_coord = self.generate_trajectory()
+        self.system_coord = 0
 
     def init_window(self, name='System Mapping', w=640, h=480):
         pangolin.CreateWindowAndBind(name, w, h)
@@ -83,6 +88,11 @@ class Mapper(Thread):
         else:
             pose[:3, 3] = coord
 
+        print(pose)
+        if self.cur_pose is not None:
+            #pose[0:3, 0:3] = np.matmul(self.cur_pose, np.identity(3))
+            pass
+
         self.poses.append(pose)
 
         gl.glLineWidth(1)
@@ -93,7 +103,7 @@ class Mapper(Thread):
     # Appends new_points to points list, TODO: use our data structures
     def draw_point_cloud(self, new_points, size=2):
         if new_points is None:
-            new_points = np.random.random((50, 3)) * 3 - 4 + self.current_system_coordinate()
+            new_points = np.random.random((50, 3)) * 3 - 4 + np.transpose(self.system_coord)
         self.points += new_points.tolist()
         gl.glPointSize(size)
         gl.glColor3f(0.0, 1.0, 0.0)
@@ -109,14 +119,22 @@ class Mapper(Thread):
         # TODO: Probably block on draw() call here
         # Continue until <esc>
         while self.continue_mapping():
+            if len(self.q) <= 0:
+                continue
+
             gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
             gl.glClearColor(1.0, 1.0, 1.0, 1.0)
             self.dcam.Activate(self.scam)
             
-            self.path.append(next(self.system_coord))
+            translation = self.q.pop()
+            #print(translation)
+            self.system_coord = self.system_coord + translation
+            print(self.system_coord)
+            self.path.append(self.system_coord[0])
+            #print(self.system_coord)
 
             self.draw_trajectory()
-            self.draw_keyframe(pose=None, coord=self.path[-1])
+            self.draw_keyframe(pose=None, coord=np.transpose(self.system_coord))
             self.draw_point_cloud(None)
 
             pangolin.FinishFrame()

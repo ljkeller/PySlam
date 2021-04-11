@@ -79,6 +79,8 @@ def main():
     totalFrames = lowFeatureFrames = 0
     framesSinceKeyframeInsert = 0
 
+    acummulatingPose = np.identity(3)
+
     while(cap.isOpened()):
 
         ret, frame = cap.read()
@@ -93,6 +95,14 @@ def main():
         framesSinceKeyframeInsert += 1
     
         img = pp.preprocess(frame)
+
+        # Create Camera Intrinsics matrix for 3d-2d mapping
+        H, W = img.shape
+        focal_len = 1
+        K = np.array([[focal_len/W, 0,           W//2, 0],
+                      [0,           focal_len/H, H//2, 0],
+                      [0,           0,           1,    0]])
+
         features = fe.extract(img)
         if features['kps'] is None or features['des'] is None:
             continue
@@ -119,6 +129,40 @@ def main():
                 # Homography model is good estimator for planar scenes
                 pose, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
 
+                ret1, rot, tran, _ = cv2.decomposeHomographyMat(pose, K[0:3, 0:3])
+                print(tran)
+
+                # TODO identify valid translation
+                correct_translation = tran[0]
+
+                # Recover global & local transformation data
+                F, maskf = cv2.findFundamentalMat(src_pts, dst_pts, cv2.FM_LMEDS)
+
+                E, maske = cv2.findEssentialMat(src_pts, dst_pts, K[0:3, 0:3], cv2.RANSAC, 0.9, 2)
+                r1, r2, t = cv2.decomposeEssentialMat(E)
+                print("TRANSLATION")
+                print(t)
+                print("-----")
+                #print(E)
+
+                # Two views - general moteion, general structure
+                # 1. Esimate essential/fundamental mat
+                # 2. Decompose the essential mat
+                # 3. Impose positive depth requirement (up to 4 sols)
+                # 4. Recover 3d structure
+
+                # Note fundamental mat is sensitive to all points lying on same plane
+                
+                # Keep only inliers
+                src_pts = src_pts[mask.ravel() == 1]
+                dst_pts = dst_pts[mask.ravel() == 1]
+
+                # Accumulate pose transformation to track global transform over time
+                acummulatingPose = np.matmul(pose, acummulatingPose)
+
+                map_system.q.append(correct_translation)
+                map_system.cur_pose = acummulatingPose
+
                 # TODO: Get essential matrix here, then recover pose, find which model has min error
                 #reval, mask = cv2.findFundamentalMat(src_pts, dst_pts, cv2.FM_RANSAC)
 
@@ -142,7 +186,7 @@ def main():
                 # TODO: update keyframe insertion criteria to be more reflective of ORB
                 if framesSinceKeyframeInsert >= 20:
                     # TODO: Add intrinsics
-                    keyframes.append(Keyframe(pose=pose, features=features, intrinsics=None))
+                    keyframes.append(Keyframe(pose=pose, features=features, intrinsics=K))
                     framesSinceKeyframeInsert = 0
 
             else:
