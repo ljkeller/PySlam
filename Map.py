@@ -2,6 +2,7 @@
 import numpy as np
 from threading import Thread
 import math
+import cv2
 
 # Mapping
 import OpenGL.GL as gl
@@ -19,6 +20,8 @@ class Mapper(Thread):
         self.path = []
 
         self.q = []
+        self.feature_queue = []
+
 
         self.cur_pose = None
 
@@ -104,12 +107,20 @@ class Mapper(Thread):
         gl.glColor3f(0.0, 0.0, 1.0)
         pangolin.DrawCameras(self.poses, 0.5, 0.75, 0.8)
 
+    def convert2D_4D(self, points_2d_source, points_2d_dest, pose_1, pose_2):
+        points = cv2.triangulatePoints(pose_1[:3], pose_2[:3], points_2d_source, points_2d_dest)
+        return np.transpose(points)
+
+
     # Draws points at new_points with their ABSOLUTE coordinate
     # Appends new_points to points list, TODO: use our data structures
     def draw_point_cloud(self, new_points, size=2):
         if new_points is None:
-            new_points = np.random.random((50, 3)) * 3 - 4 + np.transpose(self.system_coord)
-        self.points += new_points.tolist()
+            return
+        new_points = (new_points + np.transpose(self.system_coord)).tolist()
+        #new_points = new_points + np.transpose(self.system_coord)
+        self.points += new_points
+        #print(new_points)
         gl.glPointSize(size)
         gl.glColor3f(0.0, 1.0, 0.0)
         pangolin.DrawPoints(self.points)
@@ -131,15 +142,14 @@ class Mapper(Thread):
             gl.glClearColor(1.0, 1.0, 1.0, 1.0)
             self.dcam.Activate(self.scam)
             
-            translation = self.q.pop()
+            translation, new_points = self.q.pop()
             self.system_coord = self.system_coord + translation            
             
-            print(np.transpose(self.system_coord)[0])
             self.path.append(np.transpose(self.system_coord)[0])
 
             self.draw_trajectory()
             self.draw_keyframe(pose=None, coord=np.transpose(self.system_coord))
-            self.draw_point_cloud(None)
+            self.draw_point_cloud(new_points)
 
             pangolin.FinishFrame()
 

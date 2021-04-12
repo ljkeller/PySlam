@@ -98,10 +98,10 @@ def main():
 
         # Create Camera Intrinsics matrix for 3d-2d mapping
         H, W = img.shape
-        focal_len = 1
+        focal_len = 100
         K = np.array([[focal_len/W, 0,           W//2, 0],
                       [0,           focal_len/H, H//2, 0],
-                      [0,           0,           1,    0]])
+                      [0,           0,           1,    1]])
 
         features = fe.extract(img)
         if features['kps'] is None or features['des'] is None:
@@ -158,8 +158,18 @@ def main():
 
                 # Accumulate pose transformation to track global transform over time
                 acummulatingPose = np.matmul(pose, acummulatingPose)
+                c1 = np.concatenate((acummulatingPose, correct_translation), axis=1)
+                c2 = np.matmul(F, np.concatenate((pose, correct_translation), axis=1))
+                points_4d = map_system.convert2D_4D(src_pts, dst_pts, c1, c2)
+                mask_4d = np.abs(points_4d[:,3]) > .005
+                points_new4d = points_4d[mask_4d]
+                points_4d /= points_4d[3]
+                #mask_4d = points_4d[:,2]>0
+                #points_4d = points_4d[mask_4d]
+                points_3d = points_4d[:,:3]
+                # Matrix of 3d points
+                map_system.q.append((correct_translation, points_3d))
 
-                map_system.q.append(correct_translation)
                 map_system.cur_pose = acummulatingPose
 
                 # TODO: Get essential matrix here, then recover pose, find which model has min error
