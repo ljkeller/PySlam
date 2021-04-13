@@ -27,7 +27,7 @@ class Mapper(Thread):
 
         # Generator for next position
         #self.system_coord = self.generate_trajectory()
-        self.system_coord = 0
+        self.system_coord = np.array([0,0,0])
 
     def init_window(self, name='System Mapping', w=640, h=480):
         pangolin.CreateWindowAndBind(name, w, h)
@@ -145,7 +145,7 @@ class Mapper(Thread):
             translation, new_points = self.q.pop()
             self.system_coord = self.system_coord + translation            
             
-            self.path.append(np.transpose(self.system_coord)[0])
+            self.path.append(self.system_coord)
 
             self.draw_trajectory()
             self.draw_keyframe(pose=None, coord=np.transpose(self.system_coord))

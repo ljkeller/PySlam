@@ -23,6 +23,10 @@ def printStatistics(*, totalFrames, lowFeatureFrames, totalKeyframes):
     print(f'Total % of low-feature frames: {lowFeatureFrames/totalFrames*100:.2f}%.')
     print(f'Total keyframes: {totalKeyframes}.')
 
+def convert_world2pangolin(point):
+    t = np.array([[0,0,-1],[1,0,0],[0,1,0]])
+    return np.matmul(t, np.asarray(point))
+
 def createArgumentParser():
     # Make argument parser for PySlam
     parser = argparse.ArgumentParser(description='Python SLAM implementation.')
@@ -81,6 +85,9 @@ def main():
 
     acummulatingPose = np.identity(3)
 
+    test = np.array([1,1,1])
+    test = np.transpose(test)
+
     while(cap.isOpened()):
 
         ret, frame = cap.read()
@@ -101,7 +108,7 @@ def main():
         focal_len = 100
         K = np.array([[focal_len/W, 0,           W//2, 0],
                       [0,           focal_len/H, H//2, 0],
-                      [0,           0,           1,    1]])
+                      [0,           0,           1, 1]])
 
         features = fe.extract(img)
         if features['kps'] is None or features['des'] is None:
@@ -157,18 +164,30 @@ def main():
                 dst_pts = dst_pts[mask.ravel() == 1]
 
                 # Accumulate pose transformation to track global transform over time
+                c1 = np.concatenate((acummulatingPose, np.array([map_system.system_coord]).T), axis=1)
                 acummulatingPose = np.matmul(pose, acummulatingPose)
-                c1 = np.concatenate((acummulatingPose, correct_translation), axis=1)
-                c2 = np.matmul(F, np.concatenate((pose, correct_translation), axis=1))
+                system_plus_translation = np.array([map_system.system_coord+correct_translation]).T
+                c2 = np.concatenate((acummulatingPose,system_plus_translation[0]), axis=1)
+                #c1 = np.dot(K[:3,:3], c1)
+
+                #c2 = np.zeros((3,4))
+                #c2[:3,:3] = acummulatingPose
+                #c2[:3,3] = np.transpose(-correct_translation)
+                #c2 = np.dot(K[:3,:3], c2)
+                
                 points_4d = map_system.convert2D_4D(src_pts, dst_pts, c1, c2)
                 mask_4d = np.abs(points_4d[:,3]) > .005
                 points_new4d = points_4d[mask_4d]
                 points_4d /= points_4d[3]
-                #mask_4d = points_4d[:,2]>0
-                #points_4d = points_4d[mask_4d]
+                mask_4d = points_4d[:,2]>0
+                points_4d = points_4d[mask_4d]
                 points_3d = points_4d[:,:3]
+                points_3d = [convert_world2pangolin(np.transpose(point)) for point in points_3d]
+                
                 # Matrix of 3d points
-                map_system.q.append((correct_translation, points_3d))
+                a1 = np.matmul(pose, test)
+                a1 = a1/np.linalg.norm(a1)
+                map_system.q.append((convert_world2pangolin(a1), points_3d))
 
                 map_system.cur_pose = acummulatingPose
 
