@@ -37,7 +37,7 @@ class Mapper(Thread):
         # Define Projection and initial ModelView matrix
         self.scam = pangolin.OpenGlRenderState(
             pangolin.ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 200),
-            pangolin.ModelViewLookAt(-2, 2, -2, 0, 0, 0, pangolin.AxisDirection.AxisY))
+            pangolin.ModelViewLookAt(6,3,0, -5, 0, 0, pangolin.AxisDirection.AxisY))
         self.handler = pangolin.Handler3D(self.scam)
 
     def setup_interactive_display(self):
