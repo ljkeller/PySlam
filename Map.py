@@ -1,27 +1,27 @@
 #Standard libs
 import numpy as np
-from threading import Thread
+from multiprocessing import Process, Queue
 import math
 import cv2
+from time import sleep
 
 # Mapping
 import OpenGL.GL as gl
 import pangolin
 
 # Make mapping class that inherits from Thread
-class Mapper(Thread):
-    def __init__(self):
+class Mapper(Process):
+    def __init__(self, queue):
+        super(Mapper, self).__init__()
         self.stopped = False
-        Thread.__init__(self)
         
         # TODO: share keyframe map with main thread
         self.poses = []
         self.points = []
         self.path = []
 
-        self.q = []
-        self.feature_queue = []
-
+        # Shared memory queue
+        self.q = queue
 
         self.cur_pose = None
 
@@ -45,6 +45,9 @@ class Mapper(Thread):
         self.dcam = pangolin.CreateDisplay()
         self.dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -640.0/480.0)
         self.dcam.SetHandler(self.handler)
+
+    def join(self):
+        self.stop()
 
     # To stop Mapper run() loop
     def stop(self):
@@ -104,7 +107,8 @@ class Mapper(Thread):
         gl.glColor3f(0.0, 0.0, 1.0)
         pangolin.DrawCameras(self.poses, 0.5, 0.75, 0.8)
 
-    def convert2D_4D(self, points_2d_source, points_2d_dest, pose_1, pose_2):
+    @staticmethod
+    def convert2D_4D(points_2d_source, points_2d_dest, pose_1, pose_2):
         points = cv2.triangulatePoints(pose_1[:3], pose_2[:3], points_2d_source, points_2d_dest)
         return np.transpose(points)
 
@@ -117,7 +121,6 @@ class Mapper(Thread):
         new_points = (new_points + np.transpose(self.system_coord)).tolist()
         #new_points = new_points + np.transpose(self.system_coord)
         self.points += new_points
-        #print(new_points)
         gl.glPointSize(size)
         gl.glColor3f(0.0, 1.0, 0.0)
         pangolin.DrawPoints(self.points)
@@ -132,14 +135,14 @@ class Mapper(Thread):
         # TODO: Probably block on draw() call here
         # Continue until <esc>
         while self.continue_mapping():
-            if len(self.q) <= 0:
+            if self.q.empty():
                 continue
 
             gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
             gl.glClearColor(1.0, 1.0, 1.0, 1.0)
             self.dcam.Activate(self.scam)
             
-            translation, new_points = self.q.pop()
+            translation, new_points = self.q.get()
             self.system_coord = self.system_coord + translation            
             
             self.path.append(self.system_coord)

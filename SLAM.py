@@ -1,6 +1,7 @@
 import numpy as np
 import argparse
 from threading import Thread
+from multiprocessing import Queue, Value
 from collections import deque
 import cv2
 from matplotlib import pyplot as plt
@@ -87,7 +88,8 @@ def main():
     pp = Preprocessor(scalePercent=args.scale_percent)
     
     # Instantiate MAP & start mapping thread
-    map_system = Mapper()
+    state_information = Queue()
+    map_system = Mapper(state_information)
     map_system.start()
 
     # For post-video statistics
@@ -191,12 +193,11 @@ def main():
 
                 #Calculate extrinsic2 based off of new acummulated pose and system coords plus translation from previous location
                 extrinsic2 = np.concatenate((acummulatingPose, system_plus_translation), axis=1)
-
                 #Multiply extrinsic matrices by camera matrix
                 extrinsic1 = np.matmul(K, extrinsic1)
                 extrinsic2 = np.matmul(K, extrinsic2)
                 
-                points_4d = map_system.convert2D_4D(src_pts, dst_pts, extrinsic1, extrinsic2)
+                points_4d = Mapper.convert2D_4D(src_pts, dst_pts, extrinsic1, extrinsic2)
                 #mask_4d = np.abs(points_4d[:,3]) > .005
                 #points_4d = points_4d[mask_4d]
                 #points_4d /= points_4d[3]
@@ -212,7 +213,7 @@ def main():
                 #map_system.q.append((convert_world2pangolin(t.T[0]), points_3d))
                 
                 #Use below for z+1 translation
-                map_system.q.append((np.array([-1,0,0]), points_3d))
+                state_information.put((np.array([-1,0,0]), points_3d))
                 
                 map_system.cur_pose = acummulatingPose
 
@@ -277,17 +278,17 @@ def main():
         if cv2.waitKey(30) == 27:
             printStatistics(totalFrames=totalFrames, lowFeatureFrames=lowFeatureFrames, \
                     totalKeyframes=len(keyframes))
-            map_system.stop()
+            #map_system.()
             break
 
     # TODO: override join to call the stop function in mapper
-    map_system.stop()
-    map_system.join()
+    #map_system.stop()
     cap.release()
     cv2.destroyAllWindows()
 
     # Performance analysis
     plot_performance(time_sequence, fps_record)
+    map_system.join()
 
 if __name__ == "__main__":
     main()
