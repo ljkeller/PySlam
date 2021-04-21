@@ -265,13 +265,12 @@ def main():
 
             cv2.imshow("Current frame with delta pose", poseDeltaImage)
 
+            # Time management
             end = timer()
             elapsed = end - program_start
-            print(end)
             time_sequence.append(elapsed)
             fps = 1/(end - start)
             fps_record.append(fps)
-            print(fps)
 
 
         # Escape on <esc>
