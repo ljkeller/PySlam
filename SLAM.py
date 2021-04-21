@@ -143,8 +143,6 @@ def main():
 
                 # Recover global & local transformation data
                 F, maskf = cv2.findFundamentalMat(src_pts, dst_pts, cv2.FM_LMEDS)
-                
-                
 
                 # Two views - general moteion, general structure
                 # 1. Esimate essential/fundamental mat
@@ -161,22 +159,24 @@ def main():
                 #normalized_dst_pts = np.array([m/np.linalg.norm(m) for m in dst_pts])
                 E, maske = cv2.findEssentialMat(src_pts, dst_pts, K, cv2.RANSAC, 0.9, 2)
                 points_e, r_E, t, mask_E = cv2.recoverPose(E, src_pts, dst_pts)
-                #src_pts = src_pts[maske.ravel()==1]
-                #dst_pts = dst_pts[maske.ravel()==1]
-                #if t[0] <0:
-                #	t = -t
                 
                 correct_translation = t
 
                 # Accumulate pose transformation to track global transform over time
                 extrinsic1 = np.concatenate((acummulatingPose, np.array([map_system.system_coord]).T), axis=1)
                 acummulatingPose = np.matmul(r_E,acummulatingPose)
-                temp = np.array([-1,0,0])
-                #Use below for actual translation
+                                
+                #Use below for actual translation, uncomment line further below when appending to system coords
                 #system_plus_translation = np.array([map_system.system_coord+convert_world2pangolin(t.T[0])]).T
+                
                 #Use below for z+1 translation
+                temp = np.array([-1,0,0])
                 system_plus_translation = np.array([map_system.system_coord+temp]).T
+
+                #Calculate extrinsic2 based off of new acummulated pose and system coords plus translation from previous location
                 extrinsic2 = np.concatenate((acummulatingPose, system_plus_translation), axis=1)
+
+                #Multiply extrinsic matrices by camera matrix
                 extrinsic1 = np.matmul(K, extrinsic1)
                 extrinsic2 = np.matmul(K, extrinsic2)
                 
@@ -191,10 +191,13 @@ def main():
                 points_3d = [convert_world2pangolin(np.transpose(5*point)) for point in points_3d]
                 
                 # Matrix of 3d points
+                
                 #Use below for actual translation
                 #map_system.q.append((convert_world2pangolin(t.T[0]), points_3d))
+                
                 #Use below for z+1 translation
                 map_system.q.append((np.array([-1,0,0]), points_3d))
+                
                 map_system.cur_pose = acummulatingPose
 
                 # TODO: Get essential matrix here, then recover pose, find which model has min error
