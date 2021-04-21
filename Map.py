@@ -86,9 +86,10 @@ class Mapper(Thread):
         if pose is None:
             pose = np.identity(4)
 
-        # Fix later, pi is not 1.8
-        angle_radian = 1.8
-        y = [[math.cos(angle_radian),0,math.sin(angle_radian)],[0,1,0],[-math.sin(angle_radian),0,math.cos(angle_radian)]]
+        # Rotation to match Pangolin
+        y = [[0,0,-1],
+             [0,1,0],
+             [-1,0,0]]
         pose[:3,:3] = np.matmul(y, pose[:3,:3])
         
         # Set dx, dy, dz to random values (coordinate changes)
@@ -96,10 +97,6 @@ class Mapper(Thread):
             pose[:3, 3] = np.random.randn(3)
         else:
             pose[:3, 3] = coord
-
-        if self.cur_pose is not None:
-            #pose[0:3, 0:3] = np.matmul(self.cur_pose, np.identity(3))
-            pass
 
         self.poses.append(pose)
 

@@ -4,6 +4,7 @@ from threading import Thread
 from collections import deque
 import cv2
 from matplotlib import pyplot as plt
+from timeit import default_timer as timer
 
 # Our classes
 from Extractor import *
@@ -16,6 +17,15 @@ from Map import *
 
 MIN_MATCH_COUNT = 30
 
+def plot_performance(t, fps_record):
+    plt.xlabel("Seconds")
+    plt.ylabel("Frames")
+    plt.plot(t, fps_record, "ob")
+    plt.title("System Performance Over Time")
+    axs = plt.gca()
+    axs.set_ylim([0, 45])
+    plt.show()
+
 # Useful statistics for post-video analysis
 def printStatistics(*, totalFrames, lowFeatureFrames, totalKeyframes):
     print(f'Total frames: {totalFrames}.')
@@ -24,6 +34,7 @@ def printStatistics(*, totalFrames, lowFeatureFrames, totalKeyframes):
     print(f'Total keyframes: {totalKeyframes}.')
 
 def convert_world2pangolin(point):
+    # 3D Rotation Matrix (rotation about y)
     t = np.array([[0,0,-1],[0,1,0],[1,0,0]])
     return np.matmul(t, np.asarray(point))
 
@@ -85,10 +96,15 @@ def main():
 
     acummulatingPose = np.identity(3)
 
-    test = np.array([1,1,1])
-    test = np.transpose(test)
+    # Performance analysis
+    fps_record = []
+    time_sequence = []
+    program_start = timer()
+    elapsed = 0
 
-    while(cap.isOpened()):
+    while(cap.isOpened() and elapsed < 60.0):
+
+        start = timer()
 
         ret, frame = cap.read()
         # TODO: catch sigint
@@ -249,6 +265,13 @@ def main():
 
             cv2.imshow("Current frame with delta pose", poseDeltaImage)
 
+            # Time management
+            end = timer()
+            elapsed = end - program_start
+            time_sequence.append(elapsed)
+            fps = 1/(end - start)
+            fps_record.append(fps)
+
 
         # Escape on <esc>
         if cv2.waitKey(30) == 27:
@@ -257,9 +280,14 @@ def main():
             map_system.stop()
             break
 
+    # TODO: override join to call the stop function in mapper
+    map_system.stop()
     map_system.join()
     cap.release()
     cv2.destroyAllWindows()
+
+    # Performance analysis
+    plot_performance(time_sequence, fps_record)
 
 if __name__ == "__main__":
     main()
