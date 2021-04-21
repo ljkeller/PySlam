@@ -24,6 +24,7 @@ def printStatistics(*, totalFrames, lowFeatureFrames, totalKeyframes):
     print(f'Total keyframes: {totalKeyframes}.')
 
 def convert_world2pangolin(point):
+    # 3D Rotation Matrix (rotation about y)
     t = np.array([[0,0,-1],[0,1,0],[1,0,0]])
     return np.matmul(t, np.asarray(point))
 
