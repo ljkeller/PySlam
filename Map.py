@@ -1,6 +1,8 @@
 #Standard libs
 import numpy as np
 from threading import Thread
+import math
+import cv2
 
 # Mapping
 import OpenGL.GL as gl
@@ -17,8 +19,15 @@ class Mapper(Thread):
         self.points = []
         self.path = []
 
+        self.q = []
+        self.feature_queue = []
+
+
+        self.cur_pose = None
+
         # Generator for next position
-        self.system_coord = self.generate_trajectory()
+        #self.system_coord = self.generate_trajectory()
+        self.system_coord = np.array([0,0,0])
 
     def init_window(self, name='System Mapping', w=640, h=480):
         pangolin.CreateWindowAndBind(name, w, h)
@@ -28,7 +37,7 @@ class Mapper(Thread):
         # Define Projection and initial ModelView matrix
         self.scam = pangolin.OpenGlRenderState(
             pangolin.ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 200),
-            pangolin.ModelViewLookAt(-2, 2, -2, 0, 0, 0, pangolin.AxisDirection.AxisY))
+            pangolin.ModelViewLookAt(6,3,0, -5, 0, 0, pangolin.AxisDirection.AxisY))
         self.handler = pangolin.Handler3D(self.scam)
 
     def setup_interactive_display(self):
@@ -76,6 +85,11 @@ class Mapper(Thread):
         # Create base translation matrix
         if pose is None:
             pose = np.identity(4)
+
+        # Fix later, pi is not 1.8
+        angle_radian = 1.8
+        y = [[math.cos(angle_radian),0,math.sin(angle_radian)],[0,1,0],[-math.sin(angle_radian),0,math.cos(angle_radian)]]
+        pose[:3,:3] = np.matmul(y, pose[:3,:3])
         
         # Set dx, dy, dz to random values (coordinate changes)
         if coord is None:
@@ -83,18 +97,30 @@ class Mapper(Thread):
         else:
             pose[:3, 3] = coord
 
+        if self.cur_pose is not None:
+            #pose[0:3, 0:3] = np.matmul(self.cur_pose, np.identity(3))
+            pass
+
         self.poses.append(pose)
 
         gl.glLineWidth(1)
         gl.glColor3f(0.0, 0.0, 1.0)
         pangolin.DrawCameras(self.poses, 0.5, 0.75, 0.8)
 
+    def convert2D_4D(self, points_2d_source, points_2d_dest, pose_1, pose_2):
+        points = cv2.triangulatePoints(pose_1[:3], pose_2[:3], points_2d_source, points_2d_dest)
+        return np.transpose(points)
+
+
     # Draws points at new_points with their ABSOLUTE coordinate
     # Appends new_points to points list, TODO: use our data structures
     def draw_point_cloud(self, new_points, size=2):
         if new_points is None:
-            new_points = np.random.random((50, 3)) * 3 - 4 + self.current_system_coordinate()
-        self.points += new_points.tolist()
+            return
+        new_points = (new_points + np.transpose(self.system_coord)).tolist()
+        #new_points = new_points + np.transpose(self.system_coord)
+        self.points += new_points
+        #print(new_points)
         gl.glPointSize(size)
         gl.glColor3f(0.0, 1.0, 0.0)
         pangolin.DrawPoints(self.points)
@@ -109,15 +135,21 @@ class Mapper(Thread):
         # TODO: Probably block on draw() call here
         # Continue until <esc>
         while self.continue_mapping():
+            if len(self.q) <= 0:
+                continue
+
             gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
             gl.glClearColor(1.0, 1.0, 1.0, 1.0)
             self.dcam.Activate(self.scam)
             
-            self.path.append(next(self.system_coord))
+            translation, new_points = self.q.pop()
+            self.system_coord = self.system_coord + translation            
+            
+            self.path.append(self.system_coord)
 
             self.draw_trajectory()
-            self.draw_keyframe(pose=None, coord=self.path[-1])
-            self.draw_point_cloud(None)
+            self.draw_keyframe(pose=None, coord=np.transpose(self.system_coord))
+            self.draw_point_cloud(new_points)
 
             pangolin.FinishFrame()
 

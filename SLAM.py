@@ -23,6 +23,10 @@ def printStatistics(*, totalFrames, lowFeatureFrames, totalKeyframes):
     print(f'Total % of low-feature frames: {lowFeatureFrames/totalFrames*100:.2f}%.')
     print(f'Total keyframes: {totalKeyframes}.')
 
+def convert_world2pangolin(point):
+    t = np.array([[0,0,-1],[0,1,0],[1,0,0]])
+    return np.matmul(t, np.asarray(point))
+
 def createArgumentParser():
     # Make argument parser for PySlam
     parser = argparse.ArgumentParser(description='Python SLAM implementation.')
@@ -79,6 +83,11 @@ def main():
     totalFrames = lowFeatureFrames = 0
     framesSinceKeyframeInsert = 0
 
+    acummulatingPose = np.identity(3)
+
+    test = np.array([1,1,1])
+    test = np.transpose(test)
+
     while(cap.isOpened()):
 
         ret, frame = cap.read()
@@ -93,6 +102,14 @@ def main():
         framesSinceKeyframeInsert += 1
     
         img = pp.preprocess(frame)
+
+        # Create Camera Intrinsics matrix for 3d-2d mapping
+        H, W = img.shape
+        focal_len = 100
+        K = np.array([[W, 0,           W//2],
+                      [0,           W, H//2],
+                      [0,           0, 1]])
+
         features = fe.extract(img)
         if features['kps'] is None or features['des'] is None:
             continue
@@ -116,8 +133,72 @@ def main():
                 src_pts = np.float32([ kpDeque[0][m.queryIdx].pt for m in matches ]).reshape(-1,1,2)
                 dst_pts = np.float32([ kpDeque[1][m.trainIdx].pt for m in matches ]).reshape(-1,1,2)
                 
+                
                 # Homography model is good estimator for planar scenes
                 pose, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
+
+                ret1, rot, tran, _ = cv2.decomposeHomographyMat(pose, K)
+
+                # TODO identify valid translation
+
+                # Recover global & local transformation data
+                F, maskf = cv2.findFundamentalMat(src_pts, dst_pts, cv2.FM_LMEDS)
+
+                # Two views - general moteion, general structure
+                # 1. Esimate essential/fundamental mat
+                # 2. Decompose the essential mat
+                # 3. Impose positive depth requirement (up to 4 sols)
+                # 4. Recover 3d structure
+
+                # Note fundamental mat is sensitive to all points lying on same plane
+                
+                # Keep only inliers
+                src_pts = src_pts[mask.ravel() == 1]
+                dst_pts = dst_pts[mask.ravel() == 1]
+                #normalized_src_pts = np.array([m/np.linalg.norm(m) for m in src_pts])
+                #normalized_dst_pts = np.array([m/np.linalg.norm(m) for m in dst_pts])
+                E, maske = cv2.findEssentialMat(src_pts, dst_pts, K, cv2.RANSAC, 0.9, 2)
+                points_e, r_E, t, mask_E = cv2.recoverPose(E, src_pts, dst_pts)
+                
+                correct_translation = t
+
+                # Accumulate pose transformation to track global transform over time
+                extrinsic1 = np.concatenate((acummulatingPose, np.array([map_system.system_coord]).T), axis=1)
+                acummulatingPose = np.matmul(r_E,acummulatingPose)
+                                
+                #Use below for actual translation, uncomment line further below when appending to system coords
+                #system_plus_translation = np.array([map_system.system_coord+convert_world2pangolin(t.T[0])]).T
+                
+                #Use below for z+1 translation
+                temp = np.array([-1,0,0])
+                system_plus_translation = np.array([map_system.system_coord+temp]).T
+
+                #Calculate extrinsic2 based off of new acummulated pose and system coords plus translation from previous location
+                extrinsic2 = np.concatenate((acummulatingPose, system_plus_translation), axis=1)
+
+                #Multiply extrinsic matrices by camera matrix
+                extrinsic1 = np.matmul(K, extrinsic1)
+                extrinsic2 = np.matmul(K, extrinsic2)
+                
+                points_4d = map_system.convert2D_4D(src_pts, dst_pts, extrinsic1, extrinsic2)
+                #mask_4d = np.abs(points_4d[:,3]) > .005
+                #points_4d = points_4d[mask_4d]
+                #points_4d /= points_4d[3]
+                #points_4d = np.array([point/point[3] for point in points_4d])
+                #mask_4d = points_4d[:,2]>0
+                #points_4d = points_4d[mask_4d]
+                points_3d = points_4d[:,:3]
+                points_3d = [convert_world2pangolin(np.transpose(5*point)) for point in points_3d]
+                
+                # Matrix of 3d points
+                
+                #Use below for actual translation
+                #map_system.q.append((convert_world2pangolin(t.T[0]), points_3d))
+                
+                #Use below for z+1 translation
+                map_system.q.append((np.array([-1,0,0]), points_3d))
+                
+                map_system.cur_pose = acummulatingPose
 
                 # TODO: Get essential matrix here, then recover pose, find which model has min error
                 #reval, mask = cv2.findFundamentalMat(src_pts, dst_pts, cv2.FM_RANSAC)
@@ -142,7 +223,7 @@ def main():
                 # TODO: update keyframe insertion criteria to be more reflective of ORB
                 if framesSinceKeyframeInsert >= 20:
                     # TODO: Add intrinsics
-                    keyframes.append(Keyframe(pose=pose, features=features, intrinsics=None))
+                    keyframes.append(Keyframe(pose=pose, features=features, intrinsics=K))
                     framesSinceKeyframeInsert = 0
 
             else:
