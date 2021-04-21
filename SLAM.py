@@ -4,6 +4,7 @@ from threading import Thread
 from collections import deque
 import cv2
 from matplotlib import pyplot as plt
+from timeit import default_timer as timer
 
 # Our classes
 from Extractor import *
@@ -15,6 +16,15 @@ from Endpoint import Endpoint
 from Map import *
 
 MIN_MATCH_COUNT = 30
+
+def plot_performance(t, fps_record):
+    plt.xlabel("Seconds")
+    plt.ylabel("Frames")
+    plt.plot(t, fps_record, "ob")
+    plt.title("System Performance Over Time")
+    axs = plt.gca()
+    axs.set_ylim([0, 45])
+    plt.show()
 
 # Useful statistics for post-video analysis
 def printStatistics(*, totalFrames, lowFeatureFrames, totalKeyframes):
@@ -86,10 +96,15 @@ def main():
 
     acummulatingPose = np.identity(3)
 
-    test = np.array([1,1,1])
-    test = np.transpose(test)
+    # Performance analysis
+    fps_record = []
+    time_sequence = []
+    program_start = timer()
+    elapsed = 0
 
-    while(cap.isOpened()):
+    while(cap.isOpened() and elapsed < 60.0):
+
+        start = timer()
 
         ret, frame = cap.read()
         # TODO: catch sigint
@@ -250,6 +265,14 @@ def main():
 
             cv2.imshow("Current frame with delta pose", poseDeltaImage)
 
+            end = timer()
+            elapsed = end - program_start
+            print(end)
+            time_sequence.append(elapsed)
+            fps = 1/(end - start)
+            fps_record.append(fps)
+            print(fps)
+
 
         # Escape on <esc>
         if cv2.waitKey(30) == 27:
@@ -258,9 +281,14 @@ def main():
             map_system.stop()
             break
 
+    # TODO: override join to call the stop function in mapper
+    map_system.stop()
     map_system.join()
     cap.release()
     cv2.destroyAllWindows()
+
+    # Performance analysis
+    plot_performance(time_sequence, fps_record)
 
 if __name__ == "__main__":
     main()
