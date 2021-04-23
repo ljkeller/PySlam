@@ -98,6 +98,8 @@ def main():
 
     acummulatingPose = np.identity(3)
 
+    base_extrinsic = np.array([[0,0,-1],[0,1,0],[1,0,0]])
+
     # Performance analysis
     fps_record = []
     time_sequence = []
@@ -181,8 +183,9 @@ def main():
                 correct_translation = t
 
                 # Accumulate pose transformation to track global transform over time
-                extrinsic1 = np.concatenate((acummulatingPose, np.array([map_system.system_coord]).T), axis=1)
+                extrinsic1 = np.concatenate((base_extrinsic, np.array([map_system.system_coord]).T), axis=1)
                 acummulatingPose = np.matmul(r_E,acummulatingPose)
+                pose2 = np.matmul(K, r_E)
                                 
                 #Use below for actual translation, uncomment line further below when appending to system coords
                 #system_plus_translation = np.array([map_system.system_coord+convert_world2pangolin(t.T[0])]).T
@@ -191,21 +194,30 @@ def main():
                 temp = np.array([-1,0,0])
                 system_plus_translation = np.array([map_system.system_coord+temp]).T
 
-                #Calculate extrinsic2 based off of new acummulated pose and system coords plus translation from previous location
-                extrinsic2 = np.concatenate((acummulatingPose, system_plus_translation), axis=1)
                 #Multiply extrinsic matrices by camera matrix
-                extrinsic1 = np.matmul(K, extrinsic1)
-                extrinsic2 = np.matmul(K, extrinsic2)
+                print(np.concatenate((base_extrinsic, np.zeros((3,1))), axis=1))
+                extrinsic1 = np.matmul(K, np.concatenate((base_extrinsic, np.zeros((3,1))), axis=1))
+                extrinsic2 = np.matmul(K, np.concatenate((r_E, t), axis=1))
                 
                 points_4d = Mapper.convert2D_4D(src_pts, dst_pts, extrinsic1, extrinsic2)
-                #mask_4d = np.abs(points_4d[:,3]) > .005
-                #points_4d = points_4d[mask_4d]
-                #points_4d /= points_4d[3]
-                #points_4d = np.array([point/point[3] for point in points_4d])
-                #mask_4d = points_4d[:,2]>0
-                #points_4d = points_4d[mask_4d]
+
+                # Filter out points that are too far
+                mask_4d = np.abs(points_4d[:,3]) > .2
+                points_4d = points_4d[mask_4d]
+                points_4d /= points_4d[3]
+                points_4d = np.array([point/point[3] for point in points_4d])
+
+                # Filter out points behind camera
+                mask_4d = points_4d[:,2]>0
+                points_4d = points_4d[mask_4d]
+
+                # Bad frame
+                if len(points_4d) == 0:
+                	continue
+
+                # Filter out homogenous val column
                 points_3d = points_4d[:,:3]
-                points_3d = [convert_world2pangolin(np.transpose(5*point)) for point in points_3d]
+                points_3d = [convert_world2pangolin(np.transpose(3*point)) for point in points_3d]
                 
                 # Matrix of 3d points
                 
@@ -213,8 +225,10 @@ def main():
                 #map_system.q.append((convert_world2pangolin(t.T[0]), points_3d))
                 
                 #Use below for z+1 translation
-                state_information.put((np.array([-1,0,0]), points_3d))
+                state_information.put((r_E, np.array([-1,0,0]), points_3d))
+                #state_information.put((r_E, convert_world2pangolin(t.T[0]), points_3d))
                 
+                # TODO: Use acummulatingPose for translation in map
                 map_system.cur_pose = acummulatingPose
 
                 # TODO: Get essential matrix here, then recover pose, find which model has min error
@@ -233,6 +247,7 @@ def main():
 
                 # Overlay perspective transform so its visible how camera is moving through environment
                 poseDeltaImage = cv2.polylines(frameDeque[0].copy(),[np.int32(dst)],True,255,3, cv2.LINE_AA)
+                cv2.imshow("Current frame with delta pose", poseDeltaImage)
 
                 # TODO: Develop 2 models, one for planar and one for non planar scene. 
                 # Calculate idea model for given situation & use it
@@ -264,7 +279,7 @@ def main():
                 cv2.imshow("Inlier Matches", inlierMatches)
                 cv2.imshow("Matches", matchImage)
 
-            cv2.imshow("Current frame with delta pose", poseDeltaImage)
+            
 
             # Time management
             end = timer()

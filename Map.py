@@ -39,12 +39,22 @@ class Mapper(Process):
             pangolin.ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 200),
             pangolin.ModelViewLookAt(6,3,0, -5, 0, 0, pangolin.AxisDirection.AxisY))
         self.handler = pangolin.Handler3D(self.scam)
+        print(dir(self.scam))
 
     def setup_interactive_display(self):
         # Create Interactive View in window
         self.dcam = pangolin.CreateDisplay()
         self.dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -640.0/480.0)
         self.dcam.SetHandler(self.handler)
+
+        # For following system
+        self.Twc = pangolin.OpenGlMatrix()
+        self.Twc.SetIdentity()
+
+    def follow_system(self, global_coord):
+	    x, y, z = global_coord
+	    self.Twc = self.Twc.Translate(x, y, z)
+	    self.scam.Follow(self.Twc, True)
 
     def join(self):
         self.stop()
@@ -84,22 +94,19 @@ class Mapper(Process):
             pangolin.DrawLine(np.array(self.path))
 
     # Draws a keyframe with given pose at given coordinate
-    def draw_keyframe(self, pose, coord):
-        # Create base translation matrix
-        if pose is None:
-            pose = np.identity(4)
+    def draw_keyframe(self, rot, coord):
+        # Create base translation matrix, must use homogenous coords
+        pose = np.identity(4)
+        if rot is None:
+            rot = np.identity(3)
 
-        # Rotation to match Pangolin
-        y = [[0,0,-1],
+        pangolin_rotation = [[0,0,-1],
              [0,1,0],
              [-1,0,0]]
-        pose[:3,:3] = np.matmul(y, pose[:3,:3])
-        
-        # Set dx, dy, dz to random values (coordinate changes)
-        if coord is None:
-            pose[:3, 3] = np.random.randn(3)
-        else:
-            pose[:3, 3] = coord
+        rot = np.matmul(pangolin_rotation, rot)
+
+        pose[:3, :3] = rot
+        pose[:3, 3] = coord
 
         self.poses.append(pose)
 
@@ -132,6 +139,12 @@ class Mapper(Process):
         self.set_projection_and_model_view()
         self.setup_interactive_display()
 
+        # Twc = pangolin.OpenGlMatrix()
+        # Twc.SetIdentity()
+        # print(dir(Twc))
+
+        # self.scam.Follow(Twc, True)
+
         # TODO: Probably block on draw() call here
         # Continue until <esc>
         while self.continue_mapping():
@@ -142,13 +155,18 @@ class Mapper(Process):
             gl.glClearColor(1.0, 1.0, 1.0, 1.0)
             self.dcam.Activate(self.scam)
             
-            translation, new_points = self.q.get()
+            rot, translation, new_points = self.q.get()
+
+            self.follow_system(self.system_coord)
+
+
             self.system_coord = self.system_coord + translation            
             
             self.path.append(self.system_coord)
 
             self.draw_trajectory()
-            self.draw_keyframe(pose=None, coord=np.transpose(self.system_coord))
+            # TODO: Add rotation support https://stackoverflow.com/questions/10048018/opengl-camera-rotation
+            self.draw_keyframe(rot=None, coord=np.transpose(self.system_coord))
             self.draw_point_cloud(new_points)
 
             pangolin.FinishFrame()
