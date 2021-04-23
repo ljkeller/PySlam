@@ -166,7 +166,7 @@ class Mapper(Process):
 
             self.draw_trajectory()
             # TODO: Add rotation support https://stackoverflow.com/questions/10048018/opengl-camera-rotation
-            self.draw_keyframe(rot=None, coord=np.transpose(self.system_coord))
+            self.draw_keyframe(rot=rot, coord=np.transpose(self.system_coord))
             self.draw_point_cloud(new_points)
 
             pangolin.FinishFrame()

@@ -39,14 +39,13 @@ class Extractor:
 
     def extract(self, frame):
         # Find the keypoints, then compute the descriptors
-        kp = self.orb.detect(frame, None)
+        #kp = self.orb.detect(frame, None)
         pts = cv2.goodFeaturesToTrack(frame, 3000, qualityLevel=0.01, minDistance=7)
 
         if pts is None:
             return {"kps":None, "des":None}
 
-        kps = [cv2.KeyPoint(x=f[0][0], y=f[0][1], _size=40) for f in pts]
-        print(kps)
+        kps = [cv2.KeyPoint(x=f[0][0], y=f[0][1], _size=20) for f in pts]
 
         kp, des = self.orb.compute(frame, kps)
         return {"kps":kp, "des":des}

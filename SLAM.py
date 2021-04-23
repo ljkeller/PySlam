@@ -205,7 +205,6 @@ def main():
                 mask_4d = np.abs(points_4d[:,3]) > .2
                 points_4d = points_4d[mask_4d]
                 points_4d /= points_4d[3]
-                points_4d = np.array([point/point[3] for point in points_4d])
 
                 # Filter out points behind camera
                 mask_4d = points_4d[:,2]>0
@@ -217,7 +216,7 @@ def main():
 
                 # Filter out homogenous val column
                 points_3d = points_4d[:,:3]
-                points_3d = [convert_world2pangolin(np.transpose(3*point)) for point in points_3d]
+                points_3d = [convert_world2pangolin(3*np.transpose(point)) for point in points_3d]
                 
                 # Matrix of 3d points
                 
