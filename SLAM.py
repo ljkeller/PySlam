@@ -104,6 +104,8 @@ def main():
     program_start = timer()
     elapsed = 0
 
+    previous_translation = None
+
     while(cap.isOpened() and elapsed < 60.0):
 
         start = timer()
@@ -178,6 +180,12 @@ def main():
                 E, maske = cv2.findEssentialMat(src_pts, dst_pts, K, cv2.RANSAC, 0.9, 2)
                 points_e, r_E, t, mask_E = cv2.recoverPose(E, src_pts, dst_pts)
                 
+                t = np.abs(t)/10
+
+                average_T = t
+                if previous_translation is not None:
+                    average_T = (t + previous_translation)/2
+                
                 correct_translation = t
 
                 # Accumulate pose transformation to track global transform over time
@@ -185,11 +193,11 @@ def main():
                 acummulatingPose = np.matmul(r_E,acummulatingPose)
                                 
                 #Use below for actual translation, uncomment line further below when appending to system coords
-                #system_plus_translation = np.array([map_system.system_coord+convert_world2pangolin(t.T[0])]).T
+                system_plus_translation = np.array([map_system.system_coord+convert_world2pangolin(average_T.T[0])]).T
                 
                 #Use below for z+1 translation
-                temp = np.array([-1,0,0])
-                system_plus_translation = np.array([map_system.system_coord+temp]).T
+                #temp = np.array([-1,0,0])
+                #system_plus_translation = np.array([map_system.system_coord+temp]).T
 
                 #Calculate extrinsic2 based off of new acummulated pose and system coords plus translation from previous location
                 extrinsic2 = np.concatenate((acummulatingPose, system_plus_translation), axis=1)
@@ -198,22 +206,24 @@ def main():
                 extrinsic2 = np.matmul(K, extrinsic2)
                 
                 points_4d = Mapper.convert2D_4D(src_pts, dst_pts, extrinsic1, extrinsic2)
-                #mask_4d = np.abs(points_4d[:,3]) > .005
-                #points_4d = points_4d[mask_4d]
+                mask_4d = np.abs(points_4d[:,3]) > .05                
+                points_4d = points_4d[mask_4d]
+                if len(points_4d) == 0:
+                    continue
                 #points_4d /= points_4d[3]
-                #points_4d = np.array([point/point[3] for point in points_4d])
-                #mask_4d = points_4d[:,2]>0
-                #points_4d = points_4d[mask_4d]
+                points_4d = np.array([point/point[3]/3 for point in points_4d])
+                mask_4d = points_4d[:,2]>0
+                points_4d = points_4d[mask_4d]
                 points_3d = points_4d[:,:3]
-                points_3d = [convert_world2pangolin(np.transpose(5*point)) for point in points_3d]
+                points_3d = [convert_world2pangolin(np.transpose(point)) for point in points_3d]
                 
                 # Matrix of 3d points
                 
                 #Use below for actual translation
-                #map_system.q.append((convert_world2pangolin(t.T[0]), points_3d))
+                state_information.put((acummulatingPose, convert_world2pangolin(average_T.T[0]), points_3d))
                 
                 #Use below for z+1 translation
-                state_information.put((np.array([-1,0,0]), points_3d))
+                #state_information.put((np.array([-1,0,0]), points_3d))
                 
                 map_system.cur_pose = acummulatingPose
 
@@ -242,6 +252,9 @@ def main():
                     # TODO: Add intrinsics
                     keyframes.append(Keyframe(pose=pose, features=features, intrinsics=K))
                     framesSinceKeyframeInsert = 0
+
+
+                previous_translation = t
 
             else:
                 lowFeatureFrames += 1

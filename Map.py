@@ -84,7 +84,14 @@ class Mapper(Process):
             pangolin.DrawLine(np.array(self.path))
 
     # Draws a keyframe with given pose at given coordinate
-    def draw_keyframe(self, pose, coord):
+    def draw_keyframe(self):
+        if len(self.poses)==0:
+            return
+        gl.glLineWidth(1)
+        gl.glColor3f(0.0, 0.0, 1.0)
+        pangolin.DrawCameras(self.poses, 0.5, 0.75, 0.8)
+
+    def insert_keyframe(self, pose, coord):
         # Create base translation matrix
         if pose is None:
             pose = np.identity(4)
@@ -102,10 +109,7 @@ class Mapper(Process):
             pose[:3, 3] = coord
 
         self.poses.append(pose)
-
-        gl.glLineWidth(1)
-        gl.glColor3f(0.0, 0.0, 1.0)
-        pangolin.DrawCameras(self.poses, 0.5, 0.75, 0.8)
+        
 
     @staticmethod
     def convert2D_4D(points_2d_source, points_2d_dest, pose_1, pose_2):
@@ -116,7 +120,7 @@ class Mapper(Process):
     # Draws points at new_points with their ABSOLUTE coordinate
     # Appends new_points to points list, TODO: use our data structures
     def draw_point_cloud(self, new_points, size=2):
-        if new_points is None:
+        if new_points is None or len(new_points)==0:
             return
         new_points = (new_points + np.transpose(self.system_coord)).tolist()
         #new_points = new_points + np.transpose(self.system_coord)
@@ -134,23 +138,33 @@ class Mapper(Process):
 
         # TODO: Probably block on draw() call here
         # Continue until <esc>
+        keyframe_counter = 0
         while self.continue_mapping():
             if self.q.empty():
                 continue
+
+            keyframe_counter += 1
+            print(keyframe_counter)
 
             gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
             gl.glClearColor(1.0, 1.0, 1.0, 1.0)
             self.dcam.Activate(self.scam)
             
-            translation, new_points = self.q.get()
+            poseNew, translation, new_points = self.q.get()
             self.system_coord = self.system_coord + translation            
             
             self.path.append(self.system_coord)
 
             self.draw_trajectory()
-            self.draw_keyframe(pose=None, coord=np.transpose(self.system_coord))
+            if keyframe_counter > 5:
+                self.insert_keyframe(pose=None, coord=np.transpose(self.system_coord))
+                keyframe_counter = 0
+                
+            self.draw_keyframe()
+            
             self.draw_point_cloud(new_points)
 
             pangolin.FinishFrame()
+            
 
 
